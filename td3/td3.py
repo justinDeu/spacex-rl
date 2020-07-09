@@ -6,16 +6,19 @@ import gym
 import numpy as np
 import torch
 from torch.optim import Adam
+from torch.utils.tensorboard import SummaryWriter
 
 from .replay import ReplayBuffer
 from .ac import MLPActorCritic
 
-def td3(env_fn, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0, 
+def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
         update_after=1000, update_every=50, act_noise=0.1, target_noise=0.2, 
         noise_clip=0.5, policy_delay=2, num_test_episodes=10, max_ep_len=1000, 
         logger_kwargs=dict(), save_freq=1):
+
+    writer = SummaryWriter(f'logs/{exp_name}')
     
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -60,7 +63,7 @@ def td3(env_fn, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
         loss_q2 = ((q2 - backup) ** 2).mean()
         loss_q = loss_q1 + loss_q2
 
-        loss_info = {'q1_vals': q1.detach().numpy(), 'q2__vals': q2.detach().numpy()}
+        loss_info = {'q1_vals': q1.detach().numpy(), 'q2_vals': q2.detach().numpy()}
         
         return loss_q, loss_info
 
@@ -72,7 +75,7 @@ def td3(env_fn, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
     pi_optimizer = Adam(ac.pi.parameters(), lr=pi_lr)
     q_optimizer = Adam(q_params, lr=q_lr)
 
-    def update(data, timer):
+    def update(data, timer, count):
         q_optimizer.zero_grad()
         loss_q, loss_info = calc_loss_q(data)
         loss_q.backward()
@@ -87,6 +90,8 @@ def td3(env_fn, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
             loss_pi.backward()
             pi_optimizer.step()
 
+            writer.add_scalar('pi loss', loss_pi.item(), count)
+
             for p in q_params:
                 p.requires_grad = True 
 
@@ -94,6 +99,9 @@ def td3(env_fn, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
             for p, p_targ in zip(ac.parameters(), ac_targ.parameters()):
                 p_targ.data.mul_(polyak)
                 p_targ.data.add_((1 - polyak) * p.data)
+
+        writer.add_scalar('q1 loss', loss_info['q1_vals'].mean().item(), count)
+        writer.add_scalar('q2 loss', loss_info['q2_vals'].mean().item(), count)
 
     def get_action(obs, noise_scale):
         a = ac.act(torch.as_tensor(obs, dtype=torch.float32))
@@ -113,17 +121,21 @@ def td3(env_fn, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
                 obs, rew, done, _ = test_env.step(get_action(o, 0))
                 ep_ret += rew
                 ep_len += 1
-            # here is where you would write this out to tensorboard or something!
+
             ep_rewards.append(ep_ret)
             ep_lengths.append(ep_len)
-        print(f'\tAvg Ep. Reward: {sum(ep_rewards) / len(ep_rewards)}')
-        print(f'\tAvg Ep. Length: {sum(ep_lengths) / len(ep_lengths)}')
+
+        return sum(ep_rewards) / len(ep_rewards), sum(ep_lengths) / len(ep_lengths)
 
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
     o = env.reset()
     ep_ret = 0
     ep_len = 0
+    ep_count = 0
+    update_count = 0
+
+    print(f'Running epoch 0....')
 
     for t in range(total_steps):
         if t > start_steps:
@@ -142,20 +154,30 @@ def td3(env_fn, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
         o = o2
 
         if d or (ep_len == max_ep_len):
-            # log episode results to tensorboard
+            writer.add_scalar('episode reward', ep_ret, ep_count)
+            writer.add_scalar('episode length', ep_len, ep_count)
+
             o = env.reset()
             ep_ret = 0
             ep_len = 0
+            ep_count += 1
 
         if t >= update_after and t % update_every == 0:
             for i in range(update_every):
                 batch = replay_buffer.sample(batch_size)
-                update(data=batch, timer=i)
+                update(data=batch, timer=i, count=update_count)
+                update_count += 1
 
         if (t + 1) % steps_per_epoch == 0:
             epoch = (t + 1) // steps_per_epoch
 
             # save model at end of epoch here, print epoch stuff
-            print(f'Epoch: {epoch}')
+            torch.save(ac.state_dict(), f'models/{exp_name}')
 
-            test_agent()
+            avg_test_reward, avg_test_length = test_agent()
+            writer.add_scalar('avg. test episode reward per epoch', avg_test_reward, epoch)
+            writer.add_scalar('avg. test episode length per epoch', avg_test_length, epoch)
+            print(f'Running epoch {epoch}...')
+
+
+    writer.close()
