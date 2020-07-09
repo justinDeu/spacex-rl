@@ -13,6 +13,8 @@ from torch.utils.tensorboard import SummaryWriter
 from .replay import ReplayBuffer
 from .ac import MLPActorCritic
 
+SAVE_DIR = 'runs'
+
 def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
@@ -20,10 +22,10 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
         noise_clip=0.5, policy_delay=2, num_test_episodes=10, max_ep_len=1000, 
         logger_kwargs=dict(), save_freq=25):
 
-    writer = SummaryWriter(f'logs/{exp_name}')
+    writer = SummaryWriter(f'{SAVE_DIR}/{exp_name}')
 
-    if not os.path.exists(f'models/{exp_name}'):
-        os.makedirs(f'models/{exp_name}')
+    if not os.path.exists(f'{SAVE_DIR}/{exp_name}'):
+        os.makedirs(f'{SAVE_DIR}/{exp_name}')
     
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -141,6 +143,7 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
     ep_count = 0
     update_count = 0
     best_test_reward = None
+    epoch_start_time = time.time()
 
     print(f'Running epoch 0....')
 
@@ -177,24 +180,31 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
 
         if (t + 1) % steps_per_epoch == 0:
             avg_test_reward, avg_test_length = test_agent()
+            epoch_duration = time.time() - epoch_start_time
+
             print(f'\tAvg. Test Reward: {avg_test_reward}')
             print(f'\tAvg. Test Length: {avg_test_length}')
+            print(f'\tDuration: {epoch_duration}')
 
             if not best_test_reward or avg_test_reward > best_test_reward:
                 best_test_reward = avg_test_reward
-                torch.save(ac.state_dict(), f'models/{exp_name}/{exp_name}_best')
+                torch.save(ac.state_dict(), f'{SAVE_DIR}/{exp_name}/{exp_name}_best')
                 print('\tImproved Model! Overrode best model so far.')
                 
             if (epoch + 1) % save_freq == 0 or epoch == 0:
-                torch.save(ac.state_dict(), f'models/{exp_name}/{exp_name}_{epoch}')
+                torch.save(ac.state_dict(), f'{SAVE_DIR}/{exp_name}/{exp_name}_{epoch}')
                 print('\tCheckpoint epoch reached, saved model')
+            
 
-            writer.add_scalar('epoch_test/avg_reward', avg_test_reward, epoch)
-            writer.add_scalar('epoch_test/avg_length', avg_test_length, epoch)
+            writer.add_scalar('epoch/avg_reward', avg_test_reward, epoch)
+            writer.add_scalar('epoch/avg_length', avg_test_length, epoch)
+            writer.add_scalar('epoch/duration', epoch_duration, epoch)
 
             epoch = (t + 1) // steps_per_epoch
+            epoch_start_time = time.time()
             print(f'Running epoch {epoch}...')
 
 
-    torch.save(ac.state_dict(), f'models/{exp_name}/{exp_name}_final')
+
+    torch.save(ac.state_dict(), f'{SAVE_DIR}/{exp_name}/{exp_name}_final')
     writer.close()

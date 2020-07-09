@@ -9,7 +9,7 @@ import rocket_lander_gym
 
 from td3.td3 import td3
 
-BASE_LOG_DIR = 'logs'
+BASE_LOG_DIR = 'runs'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('exp_name', type=str)
