@@ -30,7 +30,7 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
     act_dim = env.action_space.shape[0]
     act_limit = env.action_space.high[0]    # Assumes that all actions have same bound as the first!
 
-    ac = actor_critic(env.observation_space, env.action_space, *ac_kwargs)
+    ac = actor_critic(env.observation_space, env.action_space, **ac_kwargs)
     ac_targ = deepcopy(ac)
 
     for p in ac_targ.parameters():
