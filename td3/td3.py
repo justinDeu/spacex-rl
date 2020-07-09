@@ -140,6 +140,7 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
     ep_len = 0
     ep_count = 0
     update_count = 0
+    best_test_reward = None
 
     print(f'Running epoch 0....')
 
@@ -175,11 +176,19 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
                 update_count += 1
 
         if (t + 1) % steps_per_epoch == 0:
+            avg_test_reward, avg_test_length = test_agent()
+            print(f'\tAvg. Test Reward: {avg_test_reward}')
+            print(f'\tAvg. Test Length: {avg_test_length}')
 
+            if not best_test_reward or avg_test_reward > best_test_reward:
+                best_test_reward = avg_test_reward
+                torch.save(ac.state_dict(), f'models/{exp_name}/{exp_name}_best')
+                print('\tImproved Model! Overrode best model so far.')
+                
             if (epoch + 1) % save_freq == 0 or epoch == 0:
                 torch.save(ac.state_dict(), f'models/{exp_name}/{exp_name}_{epoch}')
+                print('\tCheckpoint epoch reached, saved model')
 
-            avg_test_reward, avg_test_length = test_agent()
             writer.add_scalar('epoch_test/avg_reward', avg_test_reward, epoch)
             writer.add_scalar('epoch_test/avg_length', avg_test_length, epoch)
 
