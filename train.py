@@ -1,4 +1,7 @@
 import argparse
+import os
+import shutil
+import sys
 
 import gym
 import gym.spaces
@@ -6,7 +9,7 @@ import rocket_lander_gym
 
 from td3.td3 import td3
 
-
+BASE_LOG_DIR = 'logs'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('exp_name', type=str)
@@ -17,6 +20,16 @@ parser.add_argument('--gamma', type=float, default=0.99)
 parser.add_argument('--seed', '-s', type=int, default=0)
 parser.add_argument('--epochs', type=int, default=50)
 args = parser.parse_args()
+
+exp_path = os.path.join(BASE_LOG_DIR, args.exp_name)
+
+if os.path.exists(exp_path):
+    if args.exp_name == 'test' or input(f'Do you want to overwrite experiment {args.exp_name}? [y/n]').lower() == 'y':
+        print(f'Deleteing contents of experiment folder: {args.exp_name}')
+        shutil.rmtree(exp_path) 
+    else:
+        print(f'Not overwriting experiment {args.exp_name}. Exiting!')
+        sys.exit()
 
 td3(
     lambda : gym.make(args.env),

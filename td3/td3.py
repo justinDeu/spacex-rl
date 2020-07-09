@@ -130,6 +130,7 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
     o = env.reset()
+    epoch = 0
     ep_ret = 0
     ep_len = 0
     ep_count = 0
@@ -169,7 +170,6 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
                 update_count += 1
 
         if (t + 1) % steps_per_epoch == 0:
-            epoch = (t + 1) // steps_per_epoch
 
             # save model at end of epoch here, print epoch stuff
             torch.save(ac.state_dict(), f'models/{exp_name}')
@@ -177,6 +177,8 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
             avg_test_reward, avg_test_length = test_agent()
             writer.add_scalar('epoch_test/avg_reward', avg_test_reward, epoch)
             writer.add_scalar('epoch_test/avg_length', avg_test_length, epoch)
+
+            epoch = (t + 1) // steps_per_epoch
             print(f'Running epoch {epoch}...')
 
 
