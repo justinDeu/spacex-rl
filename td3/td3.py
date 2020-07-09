@@ -2,6 +2,8 @@ from copy import deepcopy
 import itertools
 import time
 
+import os
+
 import gym
 import numpy as np
 import torch
@@ -16,9 +18,12 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
         polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
         update_after=1000, update_every=50, act_noise=0.1, target_noise=0.2, 
         noise_clip=0.5, policy_delay=2, num_test_episodes=10, max_ep_len=1000, 
-        logger_kwargs=dict(), save_freq=1):
+        logger_kwargs=dict(), save_freq=25):
 
     writer = SummaryWriter(f'logs/{exp_name}')
+
+    if not os.path.exists(f'models/{exp_name}'):
+        os.makedirs(f'models/{exp_name}')
     
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -171,8 +176,8 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
 
         if (t + 1) % steps_per_epoch == 0:
 
-            # save model at end of epoch here, print epoch stuff
-            torch.save(ac.state_dict(), f'models/{exp_name}')
+            if (epoch + 1) % save_freq == 0 or epoch == 0:
+                torch.save(ac.state_dict(), f'models/{exp_name}/{exp_name}_{epoch}')
 
             avg_test_reward, avg_test_length = test_agent()
             writer.add_scalar('epoch_test/avg_reward', avg_test_reward, epoch)
@@ -182,4 +187,5 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
             print(f'Running epoch {epoch}...')
 
 
+    torch.save(ac.state_dict(), f'models/{exp_name}/{exp_name}_final')
     writer.close()

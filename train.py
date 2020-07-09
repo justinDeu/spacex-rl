@@ -18,7 +18,8 @@ parser.add_argument('--hid', type=int, default=256)
 parser.add_argument('--l', type=int, default=2)
 parser.add_argument('--gamma', type=float, default=0.99)
 parser.add_argument('--seed', '-s', type=int, default=0)
-parser.add_argument('--epochs', type=int, default=50)
+parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--save-freg', type=int, default=5)
 args = parser.parse_args()
 
 exp_path = os.path.join(BASE_LOG_DIR, args.exp_name)
@@ -38,4 +39,5 @@ td3(
     gamma=args.gamma,
     seed=args.seed,
     epochs=args.epochs,
+    save_freq=args.save_freg
 )
