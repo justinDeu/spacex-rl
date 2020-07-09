@@ -90,7 +90,7 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
             loss_pi.backward()
             pi_optimizer.step()
 
-            writer.add_scalar('pi loss', loss_pi.item(), count)
+            writer.add_scalar('loss/avg_pi', loss_pi.item(), count)
 
             for p in q_params:
                 p.requires_grad = True 
@@ -100,8 +100,8 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
                 p_targ.data.mul_(polyak)
                 p_targ.data.add_((1 - polyak) * p.data)
 
-        writer.add_scalar('q1 loss', loss_info['q1_vals'].mean().item(), count)
-        writer.add_scalar('q2 loss', loss_info['q2_vals'].mean().item(), count)
+        writer.add_scalar('loss/avg_q1', loss_info['q1_vals'].mean().item(), count)
+        writer.add_scalar('loss/avg_q2', loss_info['q2_vals'].mean().item(), count)
 
     def get_action(obs, noise_scale):
         a = ac.act(torch.as_tensor(obs, dtype=torch.float32))
@@ -154,8 +154,8 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
         o = o2
 
         if d or (ep_len == max_ep_len):
-            writer.add_scalar('episode reward', ep_ret, ep_count)
-            writer.add_scalar('episode length', ep_len, ep_count)
+            writer.add_scalar('episode/reward', ep_ret, ep_count)
+            writer.add_scalar('episode/length', ep_len, ep_count)
 
             o = env.reset()
             ep_ret = 0
@@ -175,8 +175,8 @@ def td3(env_fn, exp_name, actor_critic=MLPActorCritic, ac_kwargs=dict(), seed=0,
             torch.save(ac.state_dict(), f'models/{exp_name}')
 
             avg_test_reward, avg_test_length = test_agent()
-            writer.add_scalar('avg. test episode reward per epoch', avg_test_reward, epoch)
-            writer.add_scalar('avg. test episode length per epoch', avg_test_length, epoch)
+            writer.add_scalar('epoch_test/avg_reward', avg_test_reward, epoch)
+            writer.add_scalar('epoch_test/avg_length', avg_test_length, epoch)
             print(f'Running epoch {epoch}...')
 
 
